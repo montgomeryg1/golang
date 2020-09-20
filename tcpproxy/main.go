@@ -8,7 +8,7 @@ import (
 
 
 func handle(src net.Conn) {
-	dst, err := net.Dial("tcp", "www.trurating.com:443")
+	dst, err := net.Dial("tcp", "joescatcam.website:80")
 	if err != nil {
 
 	}
@@ -25,7 +25,7 @@ func handle(src net.Conn) {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":443")
+	listener, err := net.Listen("tcp", ":80")
 	if err != nil {
 		log.Fatalln("Unable to bind to port")
 	}
