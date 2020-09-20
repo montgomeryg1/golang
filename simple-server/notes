@@ -1,0 +1,5 @@
+docker create network some-network
+
+docker run --name some-mysql --network some-network -v ${PWD}:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:8
+
+docker run -it --network some-network --rm mysql mysql -h some-mysql -u root -p
