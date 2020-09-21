@@ -1,30 +1,24 @@
 package main
 
 import (
-    "io/ioutil"
-    "log"
-    "net/http"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
 )
 
 func main() {
-    url := "https://api.globalcode.com.br/v1/publico/eventos"
+	resp,err := http.Get("https://www.google.com/robots.txt")
+	if err != nil {
+		log.Panicln(err)
+	}
+	
+    fmt.Println(resp.Status)
 
-    // Create a Bearer string by appending string access token
-    var bearer = "Bearer " + <ACCESS TOKEN HERE>
-
-    // Create a new request using http
-    req, err := http.NewRequest("GET", url, nil)
-
-    // add authorization header to the req
-    req.Header.Add("Authorization", bearer)
-
-    // Send req using http Client
-    client := &http.Client{}
-    resp, err := client.Do(req)
+    body,err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        log.Println("Error on response.\n[ERRO] -", err)
+		log.Panicln(err)
     }
-
-    body, _ := ioutil.ReadAll(resp.Body)
-    log.Println(string([]byte(body)))
+    fmt.Println(string(body))
+    defer resp.Body.Close()
 }
