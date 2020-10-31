@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: truservicelog-blobreader
+spec:
+  selector:
+    matchLabels:
+      app: truservicelog-blobreader
+  template:
+    metadata:
+      labels:
+        app: truservicelog-blobreader
+    spec:
+      containers:
+        - name: truservicelog-blobreader
+          image: trulivek8sacreun001.azurecr.io/truservicelog/blobreader:v9
+          envFrom: # envFrom loads multiple variables
+            - configMapRef: # from a ConfigMap
+                name: truservicelog-config-env-file
+          readinessProbe: # probes are set at the container level
+            httpGet:
+              path: /healthz # this is an HTTP GET, using the health URL
+              port: 4000
+            periodSeconds: 5 # the probe fires every thirty seconds
+          livenessProbe:
+            httpGet: # HTTP GET actions can be used in liveness and
+              path: /healthz # readiness probes - they use the same spec
+              port: 4000
+            periodSeconds: 10
+            initialDelaySeconds: 10 # wait 10 seconds before running the first probe
+            failureThreshold: 2 # allow two probes to fail before taking action
+      imagePullSecrets:
+        - name: acr-secret

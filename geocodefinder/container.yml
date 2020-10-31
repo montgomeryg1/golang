@@ -1,0 +1,45 @@
+# apiVersion: batch/v1beta1
+# kind: CronJob
+# metadata:
+#   name: geocodefinder
+# spec:
+#   schedule: "*/30 * * * *"
+#   jobTemplate:
+#     spec:
+#       template:
+#         spec:
+#           containers:
+#             - name: geocodefinder
+#               image: dockusgeorgus/geocodefinder:v3
+#           restartPolicy: OnFailure
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-geolocfinder
+spec:
+  selector:
+    matchLabels:
+      app: grafana-geolocfinder
+  template:
+    metadata:
+      labels:
+        app: grafana-geolocfinder
+    spec:
+      containers:
+        - name: grafana-geolocfinder
+          image: trulivek8sacreun001.azurecr.io/grafana/geolocfinder:v1
+          readinessProbe: # probes are set at the container level
+            httpGet:
+              path: /healthz # this is an HTTP GET, using the health URL
+              port: 4000
+            periodSeconds: 5 # the probe fires every thirty seconds
+          livenessProbe:
+            httpGet: # HTTP GET actions can be used in liveness and
+              path: /healthz # readiness probes - they use the same spec
+              port: 4000
+            periodSeconds: 10
+            initialDelaySeconds: 10 # wait 10 seconds before running the first probe
+            failureThreshold: 2 # allow two probes to fail before taking action
+      imagePullSecrets:
+        - name: acr-secret

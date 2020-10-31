@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blobreader-k8s
+spec:
+  selector:
+    matchLabels:
+      app: blobreader-k8s
+  template:
+    metadata:
+      labels:
+        app: blobreader-k8s
+    spec:
+      containers:
+        - name: blobreader
+          image: trulivek8sacreun001.azurecr.io/blobreader/truservice-k8s:v1
+          envFrom: # envFrom loads multiple variables
+            - configMapRef: # from a ConfigMap
+                name: truservicelog-config-env-file
+      imagePullSecrets:
+        - name: acr-secret

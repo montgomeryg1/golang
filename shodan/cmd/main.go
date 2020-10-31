@@ -12,8 +12,7 @@ func main() {
 	if len(os.Args) != 2 {
 		log.Fatalln("Usage: main <searchterm>")
 	}
-	// apiKey := os.Getenv("SHODAN_API_KEY")
-	apiKey := "aghSzYYBY6kXjf3fhGVh28ocFIoG8CFc"
+	apiKey := os.Getenv("SHODAN_API_KEY")
 	s := shodan.New(apiKey)
 	info, err := s.APIInfo()
 	if err != nil {

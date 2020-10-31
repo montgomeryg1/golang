@@ -1,0 +1,31 @@
+{{template "base" .}}
+
+{{define "title"}}Home{{end}}
+
+{{define "main"}}
+<h2>Latest Requests</h2>
+{{if .TruServiceRequests}}
+     <table>
+        <tr>
+            <th>PartnerId</th>
+            <th>MerchantId</th>
+            <th>TerminalId</th>
+            <th>Message Type</th>
+            <th>Info Message</th>
+            <th>Request Time</th>
+        </tr>
+        {{range .TruServiceRequests}}
+        <tr>
+            <td>{{.PartnerID}}</td>
+            <td>{{.MerchantID}}</td>
+            <td>{{.TerminalID}}</td>
+            <td>{{.MessageType}}</td>
+            <td>{{.InfoMessage}}</td>
+            <td>{{.RequestTime}}</td>
+        </tr>
+        {{end}}
+    </table>
+{{else}}
+    <p>There's nothing to see here yet!</p>
+{{end}}
+{{end}}

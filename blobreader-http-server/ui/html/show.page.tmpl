@@ -1,0 +1,24 @@
+{{template "base" .}}
+
+{{define "title"}}Request{{end}}
+
+{{define "main"}}
+    {{with .TruServiceRequest}}
+        <div class='snippet'>
+            <div class='metadata'>
+                <strong>Request Time: </strong>{{.RequestTime}}<br> 
+                <strong>PartnerId: </strong>{{.PartnerID}}<br> 
+                <strong>MerchantId: </strong>{{.MerchantID}}<br>
+                <strong>TerminalId: </strong>{{.TerminalID}}
+            </div>
+            <div class='xmlmetadata'>
+                <strong>Request Body</strong>
+            </div>
+            <pre lang="xml"><code>{{.RequestBody}}</code></pre>
+            <div class='xmlmetadata'>
+                <strong>Response Body</strong>
+            </div>
+            <pre lang="xml"><code>{{.ResponseBody}}</code></pre>
+        </div>
+    {{end}}
+{{end}}

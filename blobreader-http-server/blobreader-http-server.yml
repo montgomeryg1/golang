@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: truservice-http
+spec:
+  selector:
+    matchLabels:
+      app: truservice-http
+  template:
+    metadata:
+      labels:
+        app: truservice-http
+    spec:
+      containers:
+        - name: truservice-http
+          image: trulivek8sacreun001.azurecr.io/truservicelog/http:v1
+          livenessProbe: # To check the health of the Pod
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe: # To check if the Pod is ready to serve traffic or not
+            httpGet:
+              path: /ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 3
+      imagePullSecrets:
+        - name: acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: truservice-http-svc
+spec:
+  selector:
+    app: truservice-http
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: truservice-http
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.trurating.site/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.trurating.site/oauth2/start?rd=https%3A%2F%2F$host$request_uri"
+spec:
+  tls:
+    - hosts:
+        - truservicehttplogs.trurating.site
+      secretName: truservicehttplogs-tls-secret
+  rules:
+    - host: truservicehttplogs.trurating.site
+      http:
+        paths:
+          - backend:
+              serviceName: truservice-http-svc
+              servicePort: 8080
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: devops@trurating.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
