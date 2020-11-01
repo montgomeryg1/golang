@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -22,6 +23,12 @@ const (
     port     = 6432
     dbname   = "pedapilog"
 )
+
+// const (
+//     host     = "20.54.91.45"
+//     port     = 6432
+//     dbname   = "pedapilog"
+// )
 
 type application struct {
     errorLog *log.Logger
@@ -45,12 +52,12 @@ func ( a *application) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func waitForShutdown(srv *http.Server,chSrch chan string, quit <-chan os.Signal, done chan<- bool) {
+func waitForShutdown(srv *http.Server, quit <-chan os.Signal, done chan<- bool, stopBlobs chan<- bool, stopTimestring chan<- bool) {
 	<-quit
-	
-	close(chSrch)
+	stopBlobs <-  true
+	stopTimestring <- true
 	// Create a deadline to wait for.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	srv.Shutdown(ctx)
 
@@ -71,21 +78,24 @@ func main() {
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	stopBlobs := make(chan bool, 1)
+	stopTimestring := make(chan bool, 1)
+
 	blobs := make(chan string, 25)
 	processedBlobs := make(chan string)
 	//var wg sync.WaitGroup
 	ctx := context.Background()
 
 	chSrch := make(chan string)
-	go timeString(chSrch)
+	go timeString(chSrch,stopTimestring)
 
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, dbuser, dbpassword, dbname)
 	dbpool, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
-		errorLog.Fatalf("Unable to connect to database: %v\n", err)
+		errorLog.Fatalf("Unable to connect to pedapilog database: %v\n", err)
 	}
 	defer dbpool.Close()
-
+	batch := &pgx.Batch{}
 	
 	credential, err := azblob.NewSharedKeyCredential(storageAcct, storagekey)
 	if err != nil {
@@ -105,7 +115,7 @@ func main() {
 	}
 
 	for i := 0; i < cap(blobs); i++ {
-		go worker(ctx, blobs, processedBlobs, app)
+		go worker(ctx, blobs, processedBlobs, app, batch)
 	}
 
 	mux := http.NewServeMux()
@@ -127,37 +137,51 @@ func main() {
 		}
 	}()
 
-	go waitForShutdown(srv, chSrch, quit, done)
+	go waitForShutdown(srv, quit, done, stopBlobs, stopTimestring)
 
 	var blobcount int
-	for n := range chSrch {
-		for marker := (azblob.Marker{}); marker.NotDone(); { // The parens around Marker{} are required to avoid compiler error.
-			//fmt.Println("marker: ", marker)
-			app.infoLog.Println("searchstring: ", n)
-			// Get a result segment starting with the blob indicated by the current Marker.
-			listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{Prefix: n })
-			app.CheckError(err)
-			// IMPORTANT: ListBlobs returns the start of the next segment; you MUST use this to get
-			// the next segment (after processing the current result segment).
-			marker = listBlob.NextMarker
+	loop:
+		for n := range chSrch {
+			select {
+			case <-stopBlobs:
+				infoLog.Println("Blobreader shutting down...")
+				close(stopBlobs)
+				break loop
 
-			blobcount = len(listBlob.Segment.BlobItems)
-			infoLog.Printf("Processing %d blobs", len(listBlob.Segment.BlobItems))
-			// Process the blobs returned in this result segment (if the segment is empty, the loop body won't execute)
-			go func() {
-				for _, blobInfo := range listBlob.Segment.BlobItems {
-					//wg.Add(1)
-					blobs <- blobInfo.Name
-				}
-			}()
-			//wg.Wait()
-			for i:=0; i < blobcount; i++ {
-				<- processedBlobs
-				//infoLog.Println("Number of blobs processed:", i + 1)
+			case <-time.After(time.Second):
+				infoLog.Println("Start...")
 			}
-			infoLog.Printf("Finished processing %d blobs", len(listBlob.Segment.BlobItems))
+			for marker := (azblob.Marker{}); marker.NotDone(); { // The parens around Marker{} are required to avoid compiler error.
+				//fmt.Println("marker: ", marker)
+				//app.infoLog.Println("searchstring: ", n)
+				// Get a result segment starting with the blob indicated by the current Marker.
+				listBlob, err := containerURL.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{Prefix: n })
+				app.CheckError(err)
+				// IMPORTANT: ListBlobs returns the start of the next segment; you MUST use this to get
+				// the next segment (after processing the current result segment).
+				marker = listBlob.NextMarker
+
+				blobcount = len(listBlob.Segment.BlobItems)
+				infoLog.Printf("Processing %d blobs", len(listBlob.Segment.BlobItems))
+				// Process the blobs returned in this result segment (if the segment is empty, the loop body won't execute)
+				go func() {
+					for _, blobInfo := range listBlob.Segment.BlobItems {
+						//wg.Add(1)
+						blobs <- blobInfo.Name
+					}
+				}()
+				//wg.Wait()
+				for i:=0; i < blobcount; i++ {
+					<- processedBlobs
+					//infoLog.Println("Number of blobs processed:", i + 1)
+				}
+				br := app.db.SendBatch(ctx,batch)
+				if err := br.Close(); err != nil {
+					errorLog.Println(err)
+				}
+				infoLog.Printf("Finished processing %d blobs", len(listBlob.Segment.BlobItems))
+			}
 		}
-	}
 	close(blobs)
 	<- done
 	infoLog.Println("Server shutting down")

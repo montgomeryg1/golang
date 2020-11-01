@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: pedapilog-blobreader
-          image: trulivek8sacreun001.azurecr.io/pedapilog/blobreader:v4
+          image: trulivek8sacreun001.azurecr.io/pedapilog/blobreader:v5
           envFrom: # envFrom loads multiple variables
             - configMapRef: # from a ConfigMap
                 name: pedapilog-config-env-file
@@ -21,7 +21,7 @@ spec:
             httpGet:
               path: /healthz # this is an HTTP GET, using the health URL
               port: 4000
-            periodSeconds: 5 # the probe fires every thirty seconds
+            periodSeconds: 5
           livenessProbe:
             httpGet: # HTTP GET actions can be used in liveness and
               path: /healthz # readiness probes - they use the same spec

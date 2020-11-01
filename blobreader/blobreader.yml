@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: truservicelog-blobreader
-          image: trulivek8sacreun001.azurecr.io/truservicelog/blobreader:v9
+          image: trulivek8sacreun001.azurecr.io/truservicelog/blobreader:v10
           envFrom: # envFrom loads multiple variables
             - configMapRef: # from a ConfigMap
                 name: truservicelog-config-env-file

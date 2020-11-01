@@ -8,15 +8,16 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/jackc/pgx/v4"
 )
 
-func worker(ctx context.Context, blobs chan string, processedBlobs chan string, app *application) {
+func worker(ctx context.Context, blobs chan string, processedBlobs chan string, app *application, batch *pgx.Batch) {
 	receiptRex := regexp.MustCompile(`(?is)<Receipt>(.*?)</Receipt>`)
 	messageRex := regexp.MustCompile(`(?is)<Message>(.*?)</Message>`)
 	questionRex := regexp.MustCompile(`(?is)<Question TimeoutMs="\d+">(.*?)(4|0)`)
 	ratingRex := regexp.MustCompile(`Rating Value="(.*?)"`)
 	ipRex := regexp.MustCompile(`X-Azure-ClientIP: (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
-	insertDynStmt := `insert into "httplogs"(blobname, requesttime, messagetype, infomessage, sessionid, ipaddress, httpmethod, responsestatus, partnerid, merchantid, terminalid, url, requestbody, requestheaders, responsebody, responseheaders) values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ON CONFLICT ON CONSTRAINT blob_unique	DO NOTHING`
+	//insertDynStmt := `insert into "httplogs"(blobname, requesttime, messagetype, infomessage, sessionid, ipaddress, httpmethod, responsestatus, partnerid, merchantid, terminalid, url, requestbody, requestheaders, responsebody, responseheaders) values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ON CONFLICT ON CONSTRAINT blob_unique	DO NOTHING`
 	for b := range blobs {
 		//app.infoLog.Println("Blob name: ", b)
 
@@ -85,7 +86,7 @@ func worker(ctx context.Context, blobs chan string, processedBlobs chan string, 
 					str += i[1]
 				}
 				//fmt.Println(strings.TrimSpace(infoMsg))
-				if data.ResponseStatus == "400"{
+				if data.ResponseStatus == "401" || data.ResponseStatus == "400"{
 					str = ""
 					out := messageRex.FindAllStringSubmatch(data.ResponseBody, -1)
 					for _, i := range out {
@@ -102,10 +103,9 @@ func worker(ctx context.Context, blobs chan string, processedBlobs chan string, 
 			default:
 				msgType = "Unknown"
 		}
-		//batch.Queue("insert into httplogs(blobname, requesttime, messagetype, infomessage, sessionid, ipaddress, httpmethod, responsestatus, partnerid, merchantid, terminalid, url, requestbody, requestheaders, responsebody, responseheaders) values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ON CONFLICT ON CONSTRAINT blob_unique	DO NOTHING", b, data.RequestTime,  msgType, infoMsg, data.SessionID, ipAddr, data.HTTPMethod, data.ResponseStatus, data.PartnerID, data.MerchantID, data.TerminalID, data.URL, frmtReq, data.RequestHeaders, frmtRes, data.ResponseHeaders)
-		_, e := app.db.Exec(ctx, insertDynStmt, b, data.RequestTime,  msgType, infoMsg, data.SessionID, ipAddr, data.HTTPMethod, data.ResponseStatus, data.PartnerID, data.MerchantID, data.TerminalID, data.URL, frmtReq, data.RequestHeaders, frmtRes, data.ResponseHeaders)
-		app.CheckError(e)
-		//wg.Done()
+		batch.Queue("insert into httplogs(blobname, requesttime, messagetype, infomessage, sessionid, ipaddress, httpmethod, responsestatus, partnerid, merchantid, terminalid, url, requestbody, requestheaders, responsebody, responseheaders) values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ON CONFLICT ON CONSTRAINT blob_unique DO NOTHING", b, data.RequestTime,  msgType, infoMsg, data.SessionID, ipAddr, data.HTTPMethod, data.ResponseStatus, data.PartnerID, data.MerchantID, data.TerminalID, data.URL, frmtReq, data.RequestHeaders, frmtRes, data.ResponseHeaders)
+		//_, e := app.db.Exec(ctx, insertDynStmt, b, data.RequestTime,  msgType, infoMsg, data.SessionID, ipAddr, data.HTTPMethod, data.ResponseStatus, data.PartnerID, data.MerchantID, data.TerminalID, data.URL, frmtReq, data.RequestHeaders, frmtRes, data.ResponseHeaders)
+		//app.CheckError(e)
 		processedBlobs <- b
 	}
 	

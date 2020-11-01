@@ -7,6 +7,8 @@ require (
 	github.com/Azure/azure-storage-blob-go v0.11.0
 	github.com/Azure/go-autorest/autorest v0.11.10 // indirect
 	github.com/google/uuid v1.1.2 // indirect
+	github.com/jackc/pgconn v1.7.1 // indirect
+	github.com/jackc/pgtype v1.6.1 // indirect
 	github.com/jackc/pgx/v4 v4.9.0
 	github.com/lib/pq v1.8.0
 	github.com/prometheus/client_golang v1.8.0
