@@ -37,33 +37,6 @@ type application struct {
 	containerURL *azblob.ContainerURL
 }
 
-func ( app *application) CheckError(err error) {
-    if err != nil {
-		trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
-        app.errorLog.Output(2, trace)
-    }
-}
-
-
-func ( a *application) healthHandler(w http.ResponseWriter, r *http.Request) {
-	// if err := a.db.Ping(); err != nil {
-    //     w.WriteHeader(http.StatusInternalServerError)
-    // }
-	w.WriteHeader(http.StatusOK)
-}
-
-func waitForShutdown(srv *http.Server, quit <-chan os.Signal, done chan<- bool, stopBlobs chan<- bool, stopTimestring chan<- bool) {
-	<-quit
-	stopBlobs <-  true
-	stopTimestring <- true
-	// Create a deadline to wait for.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-	srv.Shutdown(ctx)
-
-	close(done)
-}
-
 func main() {
 
 	dbuser := os.Getenv("DB_USER")
@@ -185,4 +158,31 @@ func main() {
 	close(blobs)
 	<- done
 	infoLog.Println("Server shutting down")
+}
+
+func ( app *application) CheckError(err error) {
+    if err != nil {
+		trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
+        app.errorLog.Output(2, trace)
+    }
+}
+
+
+func ( a *application) healthHandler(w http.ResponseWriter, r *http.Request) {
+	// if err := a.db.Ping(); err != nil {
+    //     w.WriteHeader(http.StatusInternalServerError)
+    // }
+	w.WriteHeader(http.StatusOK)
+}
+
+func waitForShutdown(srv *http.Server, quit <-chan os.Signal, done chan<- bool, stopBlobs chan<- bool, stopTimestring chan<- bool) {
+	<-quit
+	stopBlobs <-  true
+	stopTimestring <- true
+	// Create a deadline to wait for.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	srv.Shutdown(ctx)
+
+	close(done)
 }
